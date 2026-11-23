@@ -1,0 +1,16 @@
+
+# <tipo>(<escopo opcional>): <descrição no imperativo, minúscula, sem ponto>
+#
+# [corpo opcional: o que mudou e por quê, linhas de até 100 caracteres]
+#
+# [rodapé opcional: BREAKING CHANGE: <o que quebra>, Refs: #<issue>]
+#
+# Tipos: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+# Quebra de compatibilidade: "!" depois do tipo ou do escopo (feat(api)!: ...)
+# ou rodapé "BREAKING CHANGE:".
+# Exemplos:
+#   feat(reserva): permite remarcar pelo link
+#   fix(sincronizacao): reprocessa evento com falha uma única vez
+#   docs: explica a convenção de commits no CONTRIBUTING
+#
+# Especificação: https://www.conventionalcommits.org/en/v1.0.0/
