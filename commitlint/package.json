@@ -1,0 +1,10 @@
+{
+  "name": "@inga-c/commitlint-base",
+  "private": true,
+  "type": "module",
+  "description": "Configuração base do commitlint da IngaCode, usada pelo workflow reutilizável commitlint.yml",
+  "devDependencies": {
+    "@commitlint/cli": "21.2.4",
+    "@commitlint/config-conventional": "21.2.4"
+  }
+}
