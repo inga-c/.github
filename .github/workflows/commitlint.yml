@@ -1,0 +1,81 @@
+# Workflow reutilizável de Conventional Commits 1.0.0 da IngaCode.
+# Valida os commits do PR (job commitlint) e o título do PR (job pr-title) com o
+# commitlint e a configuração base deste repositório (commitlint/), na mesma versão
+# do workflow chamado. O repositório que chama não precisa de Node nem de config.
+#
+# Uso no repositório (.github/workflows/conventional-commits.yml):
+#
+#   on:
+#     pull_request:
+#       types: [opened, edited, synchronize, reopened]
+#   jobs:
+#     conventional-commits:
+#       uses: inga-c/.github/.github/workflows/commitlint.yml@v1
+#
+# Checks gerados: "conventional-commits / commitlint" e "conventional-commits / pr-title".
+name: Conventional Commits
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  commitlint:
+    if: github.event.pull_request
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixa o repositório do PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: repo
+      - name: Baixa a configuração base
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .commitlint-base
+          sparse-checkout: commitlint
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: .commitlint-base/commitlint/package-lock.json
+      - name: Instala o commitlint
+        run: npm ci --prefix .commitlint-base/commitlint --ignore-scripts --no-audit --no-fund
+      - name: Valida os commits do PR
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          base="$GITHUB_WORKSPACE/.commitlint-base/commitlint"
+          "$base/node_modules/.bin/commitlint" --config "$base/commitlint.config.js" \
+            --cwd repo --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+
+  pr-title:
+    if: github.event.pull_request
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixa a configuração base
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .commitlint-base
+          sparse-checkout: commitlint
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: .commitlint-base/commitlint/package-lock.json
+      - name: Instala o commitlint
+        run: npm ci --prefix .commitlint-base/commitlint --ignore-scripts --no-audit --no-fund
+      - name: Valida o título do PR
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          base="$GITHUB_WORKSPACE/.commitlint-base/commitlint"
+          printf '%s\n' "$PR_TITLE" | "$base/node_modules/.bin/commitlint" \
+            --config "$base/commitlint.config.js" --verbose

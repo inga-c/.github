@@ -1,0 +1,75 @@
+#!/bin/sh
+# Hook commit-msg da IngaCode: recusa mensagens fora do Conventional Commits 1.0.0,
+# com as regras do @commitlint/config-conventional. Não depende de Node, então serve
+# para qualquer repositório (TypeScript, Flutter, etc.). No PR, quem decide é o
+# commitlint de verdade, no workflow commitlint.yml.
+#
+# A regra de caixa da descrição é uma aproximação da do commitlint: recusa a descrição
+# que começa com maiúscula seguida de minúscula ou que está toda em maiúsculas.
+
+msg_file=${1:?uso: commit-msg <arquivo-da-mensagem>}
+
+# Comprimento em caracteres, não em bytes (descontando os bytes de continuação do UTF-8).
+chars() {
+  printf '%s' "$1" | LC_ALL=C tr -d '\200-\277' | wc -c | tr -d ' '
+}
+
+fail() {
+  printf 'commit-msg: %s\n' "$1" >&2
+  printf '  mensagem: %s\n' "$header" >&2
+  printf '  formato:  <tipo>(<escopo opcional>): <descrição>\n' >&2
+  printf '  tipos:    %s\n' "$types_list" >&2
+  printf '  padrão:   https://www.conventionalcommits.org/en/v1.0.0/\n' >&2
+  exit 1
+}
+
+types='build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test'
+types_list=$(printf '%s' "$types" | sed 's/|/, /g')
+
+# Sem comentários, sem o que vem depois da linha de corte do "git commit -v"
+# e sem linhas em branco no início.
+msg=$(sed -e '/^# -* >8 -*$/,$d' -e '/^#/d' "$msg_file" | tr -d '\r' | sed '/./,$!d')
+[ -n "$msg" ] || exit 0
+
+header=$(printf '%s\n' "$msg" | head -n 1)
+
+# Mensagens geradas pelo git que o commitlint também ignora.
+if printf '%s\n' "$header" | grep -Eq \
+  '^(Merge pull request|Merge .+ into |Merge branch |Merge tag |Merge remote-tracking branch|Merged |Automatic merge|Auto-merged |(R|r)evert |(R|r)eapply |(amend|fixup|squash)!)'; then
+  exit 0
+fi
+
+case "$header" in
+  [[:space:]]* | *[[:space:]]) fail 'o cabeçalho não pode começar nem terminar com espaço' ;;
+esac
+
+if ! printf '%s\n' "$header" | grep -Eq "^($types)(\([^)]*\))?!?: [^ ]"; then
+  fail 'cabeçalho fora do padrão (tipo em minúsculas, da lista abaixo, seguido de ": " e da descrição)'
+fi
+
+[ "$(chars "$header")" -le 100 ] || fail 'o cabeçalho passa de 100 caracteres'
+
+subject=${header#*: }
+
+case "$subject" in
+  *.) fail 'a descrição não pode terminar com ponto' ;;
+esac
+
+upper='([A-Z]|Á|À|Â|Ã|É|Ê|Í|Ó|Ô|Õ|Ú|Ç)'
+lower='([a-z]|á|à|â|ã|é|ê|í|ó|ô|õ|ú|ç)'
+if printf '%s\n' "$subject" | LC_ALL=C grep -Eq "^$upper$lower"; then
+  fail 'a descrição deve começar com letra minúscula'
+fi
+if printf '%s\n' "$subject" | LC_ALL=C grep -Eq "$upper" &&
+  ! printf '%s\n' "$subject" | LC_ALL=C grep -Eq "$lower"; then
+  fail 'a descrição não pode estar toda em maiúsculas'
+fi
+
+# Corpo e rodapé: linhas de até 100 caracteres, menos as que têm URL.
+long=$(printf '%s\n' "$msg" | sed 1d | while IFS= read -r line; do
+  case "$line" in *http://* | *https://*) continue ;; esac
+  [ "$(chars "$line")" -le 100 ] || { printf '%s' "$line"; break; }
+done)
+[ -z "$long" ] || fail "linha do corpo ou do rodapé com mais de 100 caracteres: $long"
+
+exit 0
