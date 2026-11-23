@@ -1,0 +1,21 @@
+# CI deste repositório: valida os próprios commits com o workflow reutilizável da
+# mesma versão do PR e roda os testes do hook commit-msg.
+name: CI
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  conventional-commits:
+    uses: ./.github/workflows/commitlint.yml
+
+  hook:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Testa o hook commit-msg
+        run: sh hooks/commit-msg.test.sh
