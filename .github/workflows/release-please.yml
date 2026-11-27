@@ -1,0 +1,76 @@
+# Workflow reutilizável de release-please da IngaCode.
+# A cada push na branch de release, abre ou atualiza o PR de release com a próxima versão
+# e o CHANGELOG, calculados pelos Conventional Commits. Quando esse PR entra, cria a tag e a
+# GitHub Release. A configuração fica no repositório que chama (release-please-config.json e
+# .release-please-manifest.json na raiz).
+#
+# Uso no repositório (.github/workflows/release-please.yml):
+#
+#   on:
+#     push:
+#       branches: [main]
+#   permissions:
+#     contents: write
+#     issues: write
+#     pull-requests: write
+#   jobs:
+#     release-please:
+#       uses: inga-c/.github/.github/workflows/release-please.yml@v1
+#       secrets:
+#         app-id: ${{ secrets.RELEASE_APP_ID }}
+#         private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+#
+# Sem os dois secrets, usa o GITHUB_TOKEN, e o PR de release não dispara os checks
+# obrigatórios (ver README).
+name: Release Please
+
+on:
+  workflow_call:
+    secrets:
+      app-id:
+        description: App ID (ou Client ID) do GitHub App da organização
+        required: false
+      private-key:
+        description: Chave privada do GitHub App da organização
+        required: false
+    outputs:
+      release_created:
+        description: "'true' quando esta execução criou a release"
+        value: ${{ jobs.release-please.outputs.release_created }}
+      tag_name:
+        description: "Tag da release criada (ex.: v0.1.0)"
+        value: ${{ jobs.release-please.outputs.tag_name }}
+      version:
+        description: "Versão da release criada (ex.: 0.1.0)"
+        value: ${{ jobs.release-please.outputs.version }}
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    env:
+      USE_APP: ${{ secrets.app-id != '' && secrets.private-key != '' }}
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Gera o token do GitHub App
+        id: app-token
+        if: env.USE_APP == 'true'
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.app-id }}
+          private-key: ${{ secrets.private-key }}
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+      - name: Abre o PR de release ou cria a release
+        id: release
+        uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ steps.app-token.outputs.token || github.token }}
